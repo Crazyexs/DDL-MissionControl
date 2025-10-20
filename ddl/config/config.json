@@ -1,0 +1,114 @@
+{
+  "application": {
+    "name": "CanSat Ground Station",
+    "author": "DLL",
+    "license": "CC BY-NC-SA 3.0",
+    "description": "Ground Station for CanSat (1 Hz telemetry, CSV export, SIM mode, bright-sunlight UI).",
+    "icon_path": "./ddl/resources/icons/app_icon.ico",
+    "settings": {
+      "command_prefix": "/",              
+      "logs_folder": "./saves",          
+      "on_start_maximized": true,       
+      "on_start_port_update": true,
+      "team_id": "1043",                   
+      "no_tabs_ui": true,                   
+      "theme": {
+        "background": "#FAFAFA",            
+        "text": "#111111",                 
+        "font_point_min": 14,              
+        "plot_axes_bold": true,
+        "plot_traces_bold": true
+      }
+    }
+  },
+
+  "version": { "version": "0.2.0", "status": "COMPLIANCE" },
+
+  "connection": {
+    "alarm": true,
+    "filter_character": "",                
+    "time_out": 2,
+    "bauds_default": "115200",         
+    "bauds_dic": {
+      "1200": 1200, "2400": 2400, "4800": 4800, "9600": 9600,
+      "19200": 19200, "38400": 38400, "57600": 57600, "115200": 115200
+    },
+    "xbee": {
+      "use_xbee": true,
+      "port": "AUTO",
+      "panid_netid": "1043",              
+      "broadcast": false,                 
+      "api_mode": false                   
+    }
+  },
+
+  "telemetry": {
+    "rate_hz": 1,                         
+    "csv": {
+      "enable": true,
+      "filename_pattern": "Flight_${TEAM_ID}.csv", 
+      "include_header": true,
+      "header": [
+        "TEAM_ID","MISSION_TIME","PACKET_COUNT","MODE","STATE","ALTITUDE",
+        "TEMPERATURE","PRESSURE","VOLTAGE",
+        "GYRO_R","GYRO_P","GYRO_Y",
+        "ACCEL_R","ACCEL_P","ACCEL_Y",
+        "MAG_R","MAG_P","MAG_Y",
+        "AUTO_GYRO_ROTATION_RATE",
+        "GPS_TIME","GPS_ALTITUDE","GPS_LATITUDE","GPS_LONGITUDE","GPS_SATS",
+        "CMD_ECHO"
+      ]
+    },
+    "si_units_labels": true,               
+    "state_allowlist": [
+      "LAUNCH_PAD","ASCENT","APOGEE","DESCENT","PROBE_RELEASE","PAYLOAD_RELEASE","LANDED"
+    ],
+    "packet_loss": {
+      "enable": true,
+      "show_received_count": true,      
+      "show_lost_count": true
+    }
+  },
+
+  "graphs": {
+    "default_update_time": 1.0,             
+    "filter_enabled": true,
+    "filter_ranges": {
+      "ALTITUDE": [-50, 5000],              
+      "VOLTAGE": [6.0, 16.8],            
+      "GYRO": [-500, 500],                 
+      "TEMP": [-20, 85],                    
+      "AUTO_GYRO_ROT": [0, 400]             
+    },
+    "settings": {
+      "antialias": true,
+      "opengl": false,
+      "cupy": true,
+      "numba": true,
+      "segmentedLineMode": "off"
+    },
+    "layouts": {
+      "single_page_dashboard": true,      
+      "panels": [
+        { "id": "ALTITUDE", "type": "line", "label": "Altitude (m)" },
+        { "id": "VOLTAGE",  "type": "line", "label": "Battery Voltage (V)" },
+        { "id": "ACCEL_RPY","type": "line3","label": "Accel (R/P/Y)" },
+        { "id": "GYRO_RPY", "type": "line3","label": "Gyro (R/P/Y)" }
+      ],
+      "text_boxes": [
+        "MISSION_TIME (UTC)", "STATE", "TEMP (°C)",
+        "GPS_LAT, GPS_LON, GPS_ALT (m), GPS_SATS",
+        "RECEIVED_PACKETS", "LOST_PACKETS", "CMD_ECHO"
+      ]
+    }
+  },
+
+  "simulation": {
+    "enabled": true,
+    "requires_enable_and_activate": true,   
+    "csv_profile_path": "./sim/pressure_profile.csv",
+    "csv_column": "pressure_pa",           
+    "tx_interval_s": 1.0,                  
+    "block_simp_until_activated": true     
+  }
+}

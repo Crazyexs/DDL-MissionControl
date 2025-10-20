@@ -1,0 +1,26 @@
+{
+  "serial": {
+    "ports_update": "(OK) [Available Ports]: $PORT_LIST",
+    "connected": "(OK) [CONNECTED]",
+    "disconnected": "(OK) [DISCONNECTED]",
+    "un_plugged": "(!) [CONNECTION LOST - DEVICE UNPLUGGED]",
+    "re_plugged": "(OK) [CONNECTION RESTORED - DEVICE PLUGGED]",
+    "error_connecting": "(!) [ERROR CONNECTING]"
+  },
+  "commands": {
+    "sent": "(OK) [COMMAND SENT]: $CMD",
+    "rejected": "(!) [COMMAND REJECTED]: $REASON",
+    "guard_sim": "(!) Send SIM ENABLE then SIM ACTIVATE before SIMP.",
+    "cal_ok": "(OK) [CAL SENT] Altitude will zero at launch pad.",
+    "export_ok": "(OK) [CSV EXPORTED] $FILENAME"
+  },
+  "telemetry": {
+    "rate_warning": "(!) Telemetry not at 1 Hz. Check link/XBee settings.",
+    "csv_header_missing": "(!) CSV header missing. Fix config -> telemetry.header",
+    "loss_update": "[PACKETS] received: $RX, lost: $LOST"
+  },
+  "ui": {
+    "sunlight_hint": "Sunlight mode ON: large fonts, bold plots, light background.",
+    "no_tabs_hint": "Single-page dashboard enforced (G15)."
+  }
+}

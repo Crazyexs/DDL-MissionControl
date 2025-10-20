@@ -1,0 +1,9 @@
+.venv/
+ddl/__pycache__/
+ddl/modules/__pycache__/
+ddl/ui/__pycache__/
+ddl/modules/managers/__pycache__/
+ddl/modules/utility/__pycache__/
+ddl/ui/resources/__pycache__/
+saves/
+.vscode/

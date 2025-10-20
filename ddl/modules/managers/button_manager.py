@@ -1,0 +1,6 @@
+self.parent.serial.cmd_cal()
+self.parent.serial.cmd_cx(True)
+self.parent.serial.cmd_sim("ENABLE")
+self.parent.serial.cmd_sim("ACTIVATE")
+self.parent.serial.cmd_simp(101325)
+self.parent.serial.cmd_mec("RELEASE", True)
