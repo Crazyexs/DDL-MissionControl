@@ -18,6 +18,7 @@ REQUIRED_FIELDS = [
 class SerialManager(QObject):
     data_available = pyqtSignal(str)
     update_graphs = pyqtSignal(dict)
+    landed = pyqtSignal(float, float)
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -179,6 +180,7 @@ class SerialManager(QObject):
                     if self.parent.ser.isOpen():
                         while self.parent.ser.isOpen():
                             self.parent.read_serial()
+                    
 
     def start_thread(self):
         self.all_data = open(f"./{self.logs_path}/BlackBox/flight_data.txt", 'w', encoding="utf-8")

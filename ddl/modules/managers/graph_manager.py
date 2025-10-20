@@ -12,15 +12,23 @@ class GraphManager(QObject):
         self._set_config(); self._set_layout(); self._set_graphs()
         self.last_update_time = QDateTime.currentDateTime()
         self.total_time = 0.0  # seconds since start (mission-time axis)
+        self._last_state = None
+        self._landed_popup_done = False
+        self._last_data_cache = {}
 
     # PUBLIC
     def clear(self):
         self.total_time = 0.0
+        self._last_state = None
+        self._landed_popup_done = False
+        self._last_data_cache = {}
         self.graph_alt.reset()
         self.graph_batt.reset()
         self.graph_accel.reset()
         self.graph_gyro.reset()
         self.graph_gps.reset()
+        if hasattr(self.ui, "lb_map_link"):
+            self.ui.lb_map_link.setText("")
 
     # UPDATE
     def update(self, data: dict):
@@ -29,8 +37,8 @@ class GraphManager(QObject):
             dt_s = max(0.0, self.last_update_time.msecsTo(now) / 1000.0)
             self.total_time += dt_s
 
-            # labels
-            self._update_labels(data, int(dt_s * 1000))
+            # labels + last-telemetry pretty block + landing check
+            self._update_labels_and_state(data, int(dt_s * 1000))
 
             # plots
             self.graph_alt.update(float(data.get("ALTITUDE", 0.0)), self.total_time)
@@ -54,22 +62,72 @@ class GraphManager(QObject):
         except Exception as e:
             print(f"[WARNING] UPDATE GRAPHS - {e}")
 
-    def _update_labels(self, d, ping):
+    def _pretty_last_packet(self, d: dict) -> str:
+        # Minimal pretty format; show key fields first then the rest
+        keys_first = [
+            "TEAM_ID","MISSION_TIME","PACKET_COUNT","MODE","STATE",
+            "ALTITUDE","TEMPERATURE","PRESSURE","VOLTAGE",
+            "GYRO_R","GYRO_P","GYRO_Y","ACCEL_R","ACCEL_P","ACCEL_Y",
+            "MAG_R","MAG_P","MAG_Y",
+            "GPS_TIME","GPS_ALTITUDE","GPS_LATITUDE","GPS_LONGITUDE","GPS_SATS",
+            "CMD_ECHO"
+        ]
+        lines = []
+        for k in keys_first:
+            if k in d:
+                lines.append(f"{k}: {d.get(k,'')}")
+        # If any extra optional fields exist, append them
+        for k, v in d.items():
+            if k not in keys_first:
+                lines.append(f"{k}: {v}")
+        return "\n".join(lines)
+
+    def _update_labels_and_state(self, d, ping_ms):
+        # Mission time
         if hasattr(self.ui, "lb_mission_time"):
             self.ui.lb_mission_time.setText(str(d.get("MISSION_TIME","--:--:--")) + " UTC")
-        if hasattr(self.ui, "lb_state"): self.ui.lb_state.setText(d.get("STATE", ""))
+        # State
+        state = d.get("STATE", "")
+        if hasattr(self.ui, "lb_state"):
+            self.ui.lb_state.setText(state)
+        # Temperature
         if hasattr(self.ui, "lb_temp"):
             try: self.ui.lb_temp.setText(f"{float(d.get('TEMPERATURE',0.0)):.1f} °C")
             except: self.ui.lb_temp.setText("--.- °C")
+        # GPS compact line
         if hasattr(self.ui, "lb_gps"):
             gps = f"{d.get('GPS_LATITUDE','0')}, {d.get('GPS_LONGITUDE','0')} | alt {d.get('GPS_ALTITUDE','0')} m | sats {d.get('GPS_SATS','0')}"
             self.ui.lb_gps.setText(gps)
-        if hasattr(self.ui, "lb_cmd_echo"): self.ui.lb_cmd_echo.setText(d.get("CMD_ECHO",""))
-        if hasattr(self.ui, "lb_ping"): self.ui.lb_ping.setText(f"{ping} ms")
+        # Ping (optional)
+        if hasattr(self.ui, "lb_ping"):
+            self.ui.lb_ping.setText(f"{ping_ms} ms")
+        # Last telemetry pretty block
+        if hasattr(self.ui, "tb_last_telemetry"):
+            try:
+                # cache and render only if changed
+                if d != self._last_data_cache:
+                    self._last_data_cache = dict(d)
+                    self.ui.tb_last_telemetry.setPlainText(self._pretty_last_packet(d))
+            except Exception:
+                pass
+
+        # Landing detection → show maps
+        try:
+            if state == "LANDED" and not self._landed_popup_done:
+                lat = float(d.get("GPS_LATITUDE", 0.0))
+                lon = float(d.get("GPS_LONGITUDE", 0.0))
+                # Only if coordinates look valid
+                if abs(lat) > 0.0001 or abs(lon) > 0.0001:
+                    self._landed_popup_done = True
+                    # Hand off to MainWindow helper (opens browser and sets link label)
+                    if hasattr(self.parent, "show_landed_map"):
+                        self.parent.show_landed_map(lat, lon)
+        except Exception as e:
+            print("[LANDING MAP ERROR]:", e)
 
     # SETUP
     def _set_graphs(self):
-        # NASA-ish: bold axes, clear grid, SI titles
+        # Mission-time X axis graphs, SI titles
         self.graph_alt  = MonoAxisPlotWidget(title="Altitude (m)",          mission_time_axis=True)
         self.graph_batt = MonoAxisPlotWidget(title="Battery Voltage (V)",   mission_time_axis=True)
         self.graph_accel = RPYPlotWidget(title="Accel (R/P/Y)", mission_time_axis=True)

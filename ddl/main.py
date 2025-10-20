@@ -179,3 +179,16 @@ class MainWindow(QMainWindow):
                 self.serial.all_data.close()
         except Exception:
             pass
+    def show_landed_map(self, lat: float, lon: float):
+        try:
+            # Build a simple Google Maps query link
+            url = f"https://www.google.com/maps?q={lat:.6f},{lon:.6f}"
+            # Put a clickable link in the Mission Info panel
+            if hasattr(self.ui, "lb_map_link"):
+                self.ui.lb_map_link.setText(f'<a href="{url}">{lat:.6f}, {lon:.6f} — open in Google Maps</a>')
+            # Open the browser (only once per landing — GraphManager guards this)
+            import webbrowser
+            webbrowser.open(url)
+            self.update_status_bar("// LANDING location link shown")
+        except Exception as e:
+            self.update_status_bar(f"// map link error: {e}")
