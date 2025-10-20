@@ -1,188 +1,83 @@
-import os
-import time
-
-from PyQt5.QtCore import QObject
-
-# ================================================================= #
-
-class ConnectionBuffer(QObject):
+class ConnectionBuffer:
     def __init__(self, parent):
-        super().__init__(parent)
-        
         self.parent = parent
-        self.ui = parent.ui
         self.serial = parent.serial
-        self.config = parent.config
         self.terminal = parent.terminal
+        self.ui = parent.ui
+        self.prefix = parent.config.get("application.settings.command_prefix") or "/"
 
-        # messages from config
-        self.message_ports_update = self.config.get(
-            "serial.ports_update", 2)
-        self.message_error_connecting = self.config.get(
-            "serial.error_connecting", 2)
-        self.message_disconnected = self.config.get(
-            "serial.disconnected", 2)
-        self.message_connected = self.config.get(
-            "serial.connected", 2)
-
-        # logs folder from config
-        self.logs_folder = self.config.get(
-                "application.settings.logs_folder")
-
-    # ================================================================= #
-
-    # == Update Ports == #
-    def update_ports(self, override_message=False):
-        
-        self.serial.update_ports()
-        self.ui.cb_ports.clear()
-        
-        if len(self.serial.portList) == 0:
-            available_ports = "0"
-
-        else:
-            available_ports = str(
-                self.serial.portList).replace(
-                "['", "").replace(
-                "']", "")
-            
-            self.ui.cb_ports.addItems(
-                self.serial.portList)
-
-
-        if override_message == False:
-            self.terminal.write(
-                self.message_ports_update.replace(
-                    "$PORT_LIST", f"{available_ports}"))
-    
-    # == Send Data == #
     def send_data(self):
-        data = self.ui.terminal_input.text()
-
-        # if the data is a command
-        if data.startswith(self.config.get("application.settings.command_prefix")):
-            self.parent.terminal.handle_command(data)
-
-        # else send the data
-        else:
-            if self.serial.is_connected:
-                if len(data) > 0:
-                    try:
-                        self.serial.send_data(data)
-                        self.parent.terminal.write(
-                            f"<b style='color:#8cb854;'>(OK)</b> <ins style='color:#8cb854';>[Sended - '{data}']</ins>")
-                    except:
-                        self.parent.terminal.write(
-                            f"<b style='color:#a8002a;'>(!)</b> <b style='color:#a8002a;'>[Error Sending]</b> '{data}'")
-
-                else:
-                    self.parent.terminal.write("<b style='color:#a8002a;'>(!)</> <ins style='color:#a8002a;'>[Aborting - Data Is Empty]</ins>")
-                    
-            else:
-                self.parent.terminal.write(
-                    "<b style='color:#a8002a;'>(!)</b> <ins style='color:#a8002a';>[Error Sending - Not Connected] </ins>")
-
-        self.ui.terminal_input.setText("")
-    
-    # == BTN_Connect == #
-    def connect(self):
-        
-        # update ports in case the device is disconnected
-        self.update_ports(True)
-        
-        # if the device is unplugged
-        if self.serial.is_unplugged:
-            self.terminal.write("DEVICE UNPLUGGED")
-            
-        elif self.serial.dummy_enabled:
-            self.error_connecting()
-            
-        # if you are already connected
-        elif self.serial.is_connected:
-            self.disconnect()
-        
-        # connect
-        else:
-            # if you the combobox is empty
-            if len(self.ui.cb_ports.currentText()) == 0:
-                self.error_connecting()
-
-            else:
-                # change the connection variables to the ones in the ComboBoxes
-                self.serial.ser.port = self.ui.cb_ports.currentText()
-                self.serial.ser.baudrate = self.ui.cb_bauds.currentText()
-
-                # Attempt to connect to the port
-                self.serial.connect()
-                
-                if self.serial.ser.is_open:
-                    
-                    # set connected to True
-                    self.serial.is_connected = True
-                    
-                    # format the message from the configuration file
-                    formated_msg = self.message_connected.replace(
-                        "$PORT",
-                        f"{self.serial.ser.portstr}"
-                    )
-                    
-                    # update terminal with the connnected message and add a port to the connected label
-                    self.terminal.write(formated_msg)
-
-                    # change the button text to connected
-                    self.ui.btn_connect_serial.setText("connected")
-                    
-                    # update the status bar
-                    self.parent.update_status_bar(f"// #CONNECTED -> {self.serial.ser.portstr} <- {self.serial.ser.baudrate}")
-
-    # == Disconnect == #
-    def disconnect(self):
-        # disconnect from the port using the serial util
-        self.serial.disconnect()
-
-        # change button text to disconnected
-        self.ui.btn_connect_serial.setText("disconnected")
-        
-        # format the message from the configuration file
-        formated_msg = self.message_disconnected.replace(
-            "$PORT", 
-            f"{self.serial.ser.portstr}")
-        
-        # send the a terminal message confirming the action 
-        self.terminal.write(formated_msg)
-        
-        # update the connection state
-        self.serial.is_connected = False
-        
-        # update the status bar
-        self.parent.update_status_bar("")
-        self.serial.start_error = False
-        
-    # == Error Connecting == #
-    def error_connecting(self):
-        # change button checked status and label
-        self.ui.btn_connect_serial.setChecked(False)
-        self.ui.btn_connect_serial.setText("ERROR")
-        
-        # update the terminal with the error message
-        self.terminal.write(self.message_error_connecting)
-        
-        # update the status bar
-        self.parent.update_status_bar(f"// #ERROR_CONNECTING")
-
-    def toggle_recording(self):
-        """
-        Use SerialManager's CSV writer (Flight_<TEAM_ID>.csv with header) per Mission Guide.
-        This toggle now only enables/disables the writer flags, not rename/create ad-hoc files.
-        """
-        if self.ui.btn_togle_log.isChecked():
-            self.serial.record_enabled = True
-            self.terminal.write("<b style='color:#8cb854;'>(OK)</b> Recording: <ins style='color:#8cb854';>ON</ins> (Flight_<TEAM_ID>.csv)")
-        else:
-            self.serial.record_enabled = False
+        text = self.ui.terminal_input.text().strip()
+        if not text: return
+        low = text.lower()
+        # help
+        if low == f"{self.prefix}help":
+            self.terminal.write("(OK) Commands:")
+            for cmd in ["/clear","/dummy.on","/dummy.off","/dummy.time <sec>",
+                        "/cal","/cx.on","/cx.off","/st.gps","/st hh:mm:ss",
+                        "/sim.enable","/sim.activate","/sim.disable",
+                        "/simp <pressure_pa>","/mec.<device>.on","/mec.<device>.off"]:
+                self.terminal.write(f" - {cmd}")
+        elif low == f"{self.prefix}clear":
+            self.terminal.clear()
+        elif low == f"{self.prefix}dummy.on":
+            self.serial.start_dummy()
+        elif low == f"{self.prefix}dummy.off":
+            self.serial.stop_dummy()
+        elif low.startswith(f"{self.prefix}dummy.time"):
             try:
-                if getattr(self.serial, "csv_file", None):
-                    self.serial.csv_file.flush()
+                sec = float(low.split()[-1]); self.serial.set_dummy_time(sec)
+                self.terminal.write(f"(OK) Dummy time {sec}s")
+            except: self.terminal.write("(!) Usage: /dummy.time <sec>")
+        elif low == f"{self.prefix}cal":
+            self.serial.cmd_cal()
+        elif low == f"{self.prefix}cx.on":
+            self.serial.cmd_cx(True)
+        elif low == f"{self.prefix}cx.off":
+            self.serial.cmd_cx(False)
+        elif low == f"{self.prefix}st.gps":
+            self.serial.cmd_st("GPS")
+        elif low.startswith(f"{self.prefix}st "):
+            self.serial.cmd_st(text[len(f"{self.prefix}st "):].strip())
+        elif low == f"{self.prefix}sim.enable":
+            self.serial.cmd_sim("ENABLE")
+        elif low == f"{self.prefix}sim.activate":
+            self.serial.cmd_sim("ACTIVATE")
+        elif low == f"{self.prefix}sim.disable":
+            self.serial.cmd_sim("DISABLE")
+        elif low.startswith(f"{self.prefix}simp "):
+            try: self.serial.cmd_simp(int(low.split()[-1]))
+            except: self.terminal.write("(!) Usage: /simp <pressure_pa>")
+        elif low.startswith(f"{self.prefix}mec."):
+            try:
+                tail = low.split("mec.",1)[1]
+                device, action = tail.split(".")
+                self.serial.cmd_mec(device.upper(), action=="on")
             except:
-                pass
-            self.terminal.write("<b style='color:#8cb854;'>(OK)</b> Recording: <ins style='color:#a8002a';>OFF</ins>")
+                self.terminal.write("(!) Usage: /mec.<device>.on|off")
+        elif low == f"{self.prefix}sim.play":
+            self.serial.sim_play()
+        elif low == f"{self.prefix}sim.stop":
+            self.serial.sim_stop()
+
+        else:
+            # raw send
+            self.serial.send_data(text + ("\r\n" if not text.endswith("\n") else ""))
+        self.ui.terminal_input.clear()
+
+    def update_ports(self, override_message=False):
+        self.serial.update_ports()
+    def connect(self):
+        if self.ui.btn_connect_serial.isChecked(): self.serial.connect()
+        else: self.serial.disconnect()
+    def toggle_recording(self):
+        if self.ui.btn_togle_log.isChecked():
+            self.serial.record_enabled=True
+            self.terminal.write("(OK) Recording: ON (Flight_<TEAM_ID>.csv)")
+            self.serial._open_csv_if_needed()
+        else:
+            self.serial.record_enabled=False
+            try:
+                if getattr(self.serial, "csv_file", None): self.serial.csv_file.flush()
+            except: pass
+            self.terminal.write("(OK) Recording: OFF")

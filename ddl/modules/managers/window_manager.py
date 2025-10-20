@@ -1,125 +1,49 @@
+# ddl/modules/managers/window_manager.py  (DROP-IN)
+from PyQt5.QtWidgets import QWidget
 
-from PyQt5.QtCore import (QObject, Qt,
-                          QPropertyAnimation,
-                          QEasingCurve,
-                          QPoint)
+class WindowManager:
+    """
+    Safe, UI-agnostic window controller.
+    - Works even if the UI has no side menu frame (fr_menu).
+    - Provides toggles for menu, fullscreen, maximize.
+    """
 
-# ============================================================== #
-
-class WindowManager(QObject):
     def __init__(self, parent):
-        super().__init__(parent)
         self.parent = parent
         self.ui = parent.ui
-        self.config = parent.config
-
         self.clickPostion = None
-        self.full_screen = False
 
-        # == setup menu animations == #
-        # on
-        self.menu_animation_on = QPropertyAnimation(
-            self.ui.fr_menu, b'minimumWidth')
-        self.menu_animation_on.setDuration(80)
-        self.menu_animation_on.setStartValue(0)
-        self.menu_animation_on.setEndValue(200)
-        self.menu_animation_on.setEasingCurve(QEasingCurve.InOutQuart)
+        # Optional menu container (some UIs don't have it)
+        # If your UI later adds a QWidget named 'fr_menu', this will pick it up.
+        self.menu_frame: QWidget | None = getattr(self.ui, "fr_menu", None)
 
-        # off
-        self.menu_animation_off = QPropertyAnimation(
-            self.ui.fr_menu, b'minimumWidth')
-        self.menu_animation_off.setDuration(80)
-        self.menu_animation_off.setStartValue(200)
-        self.menu_animation_off.setEndValue(0)
-        self.menu_animation_off.setEasingCurve(QEasingCurve.InOutQuart)
+        # Optional menu toggle button label sync
+        self.menu_button = getattr(self.ui, "btn_togle_menu", None)
 
-    # ============================================================== #
-
-    def show_full_screen(self):
-        
-        if self.full_screen == False:
-            self.ui.btn_close.hide()
-            self.ui.btn_minimize.hide()
-            self.ui.btn_normalize.hide()
-            self.ui.btn_maximize.hide()
-            
-            self.full_screen = True
-            self.ui.btn_set_full_screen.setChecked(True)
-            self.parent.showFullScreen()
-        
-        else:
-            self.ui.btn_close.show()
-            self.ui.btn_minimize.show()
-            self.ui.btn_maximize.show()
-            
-            self.parent.showNormal()
-            self.full_screen = False
-            self.ui.btn_set_full_screen.setChecked(False)
-            
-    # == reload the window == #
-    def reload_window(self):
-
-        if self.parent.serial.is_connected:
-            self.parent.connection_buffer.disconnect()
-        
-        if self.parent.serial.dummy_enabled == True:
-            self.parent.serial.stop_dummy()
-            
-        self.parent.close()
-        self.parent.__init__()
-
-    # ================================================================= #
-
-    # == window movement == #
-    def move_window(self, event):
-        if self.full_screen == True:
-            pass
-        
-        else:
-            if self.parent.isMaximized() == False:
-                if event.buttons() == Qt.LeftButton:
-                    delta = QPoint(event.globalPos() - self.clickPostion)
-                    self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
-                    self.clickPostion = event.globalPos()
-                    event.accept()
-
-            if event.globalPos().y() < 15:
-                self.maximize_app()
-
-            else:     
-                self.normalize_app()
-        
-    # == double click on titlebar == #
-    def topbar_double_click(self, e):
-        if self.parent.isMaximized():
-            self.normalize_app()
-        else:
-            self.maximize_app()
-
-    # ================================================================= #
-
-    # == normalize == #
-    def normalize_app(self):
-        self.ui.btn_maximize.show()
-        self.ui.btn_normalize.hide()
-        
-        self.parent.showNormal()
-
-    # == maximize == #
-    def maximize_app(self):
-        self.ui.btn_normalize.show()
-        self.ui.btn_maximize.hide()
-        
-        self.parent.showMaximized()
-
-    # ================================================================= #
-
-    # == togle menu btn handler == #
+    # --------- Menu handling (optional) ---------
     def togle_menu(self):
-        width = self.ui.fr_menu.width()
+        """Toggle an optional side/menu frame if present; else no-op."""
+        if self.menu_frame is None:
+            # No menu frame in this UI; just ignore gracefully
+            return
 
-        if width == 0:
-            self.menu_animation_on.start()
+        is_visible = self.menu_frame.isVisible()
+        self.menu_frame.setVisible(not is_visible)
 
+        # If there is a toggle button, update its text to reflect state
+        if self.menu_button is not None:
+            try:
+                self.menu_button.setText("≡" if not is_visible else "×")
+            except Exception:
+                pass
+
+    # --------- Window state helpers ---------
+    def show_full_screen(self):
+        w = self.parent
+        if w.isFullScreen():
+            w.showNormal()
         else:
-            self.menu_animation_off.start()
+            w.showFullScreen()
+
+    def maximize_app(self):
+        self.parent.showMaximized()

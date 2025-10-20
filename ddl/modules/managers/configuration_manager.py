@@ -1,60 +1,80 @@
-
-import sys
 import json
+from ddl.modules.utility.resource_path import resource_path
 
-# ============================================================== #
+_DEFAULTS = {
+    "application": {
+    "name": "DDL-MISSION CONTROL ",
+        "settings": {
+            "command_prefix": "/",
+            "logs_folder": "./saves",
+            "on_start_maximized": True,
+            "on_start_port_update": True,
+            "team_id": "1043"
+        }
+    },
+    "version": { "version": "0.0.1", "status": "BETA" },
+    "connection": {
+        "alarm": True,
+        "filter_character": "",
+        "time_out": 2,
+        "bauds_default": "115200",
+        "bauds_dic": { "115200": 115200 }
+    },
+    "telemetry": {
+        "rate_hz": 1,
+        "csv": {
+            "enable": True,
+            "filename_pattern": "Flight_${TEAM_ID}.csv",
+            "include_header": True,
+            "header": [
+                "TEAM_ID","MISSION_TIME","PACKET_COUNT","MODE","STATE","ALTITUDE",
+                "TEMPERATURE","PRESSURE","VOLTAGE",
+                "GYRO_R","GYRO_P","GYRO_Y",
+                "ACCEL_R","ACCEL_P","ACCEL_Y",
+                "MAG_R","MAG_P","MAG_Y",
+                "AUTO_GYRO_ROTATION_RATE",
+                "GPS_TIME","GPS_ALTITUDE","GPS_LATITUDE","GPS_LONGITUDE","GPS_SATS",
+                "CMD_ECHO"
+            ]
+        }
+    },
+    "graphs": { "default_update_time": 1.0, "settings": { "antialias": True, "opengl": False, "cupy": True, "numba": True, "segmentedLineMode": "off" } },
+    "simulation": { "enabled": True, "csv_profile_path": "./sim/pressure_profile.csv", "csv_column": "pressure_pa", "tx_interval_s": 1.0 }
+}
 
-configuration_file_path = "./ddl/config/config.json"
-message_file_path = "./ddl/config/messages.json"
+class ConfigManager:
+    _cache = {}
 
-# get data from the configuration or message file, default file is 1, config.
-def get(index, file_index=1):
-    
-    # set the file
-    if file_index == 1:
-        path = configuration_file_path
-   
-    else:
-        path = message_file_path
-        
-    # Open The File
-    with open(path) as f:
-        config = json.load(f)
-    
-    # get the value
-    for key in index.split('.'):
-        if key not in config:
-            sys.exit(f"[CONFIG] '{key}' is not a valid key")
-        config = config[key]
-    
-    # return the value
-    return config
+    @classmethod
+    def _load(cls):
+        if cls._cache:
+            return cls._cache
 
-# ============================================================== #
+        cfg = dict(_DEFAULTS)
+        # try config.json
+        try:
+            with open(resource_path("config.json"), "r", encoding="utf-8") as f:
+                cfg.update(json.load(f))
+        except FileNotFoundError:
+            pass
 
-# edit data from the configuration or message file, default file is 1, config.
-def edit(index, value, file_index=1):
-    
-    # set the file
-    if file_index == 1:
-        path = configuration_file_path
-   
-    else:
-        path = message_file_path
-    
-    # open the file on read mode
-    with open(path, 'r') as file:
-        config_file = json.load(file)
+        # try messages.json (merge shallowly)
+        try:
+            with open(resource_path("messages.json"), "r", encoding="utf-8") as f:
+                cfg.update(json.load(f))
+        except FileNotFoundError:
+            pass
 
-    # localize the key and update the value
-    keys = index.split('.')
-    current = config_file
-    for key in keys[:-1]:
-        if key not in current:
-            sys.exit(f"[CONFIG] '{key}' is not a valid key")
-        current = current[key]
-    current[keys[-1]] = value
+        cls._cache = cfg
+        return cls._cache
 
-    # overwrite the json with the new value
-    with open(path, 'w') as file:
-        json.dump(config_file, file, indent=4)
+    @classmethod
+    def get(cls, dotted_key, default=None):
+        data = cls._load()
+        cur = data
+        for part in dotted_key.split("."):
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                return default
+        return cur
